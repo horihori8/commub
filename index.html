@@ -127,7 +127,7 @@
     </div>
 
     <script>
-        // Data from PDF Sources 
+        // Data from PDF Sources
         const vocabData = [
             // --- KSB (Topic 8) ---
             { w: "bowing", d: "bending the body forward from the waist as a social gesture/greeting" },
@@ -287,18 +287,18 @@
             
             const item = currentList[currentIndex];
             
-            // Logic: Read Definition + "Starts with [First Letter]"
-            // Handle cases where word might be undefined or empty just in case
             if(!item.w) return;
 
             const firstChar = item.w.trim().charAt(0);
-            const speechText = `${item.d}. ... ... Starts with ${firstChar}.`;
+            
+            // 【変更点】 間（タメ）を作るため、カンマと三点リーダーを追加
+            const speechText = `${item.d}. ... ... Starts with, ... ... ... ${firstChar}.`;
 
             const utter = new SpeechSynthesisUtterance(speechText);
             utter.lang = 'en-US';
-            utter.rate = 0.9; // Slightly slower for clarity
+            utter.rate = 0.9; 
             
-            window.speechSynthesis.cancel(); // Stop previous
+            window.speechSynthesis.cancel(); 
             window.speechSynthesis.speak(utter);
         }
 
@@ -317,8 +317,6 @@
 
         function nextQuestion() {
             if (!isRevealed) {
-                // If user clicks Next without revealing, reveal first? 
-                // Or just move on. Let's move on but stop audio.
                 window.speechSynthesis.cancel();
             }
             currentIndex++;
