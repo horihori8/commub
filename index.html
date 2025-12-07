@@ -6,7 +6,7 @@
     <title>English Vocabulary Audio Quiz</title>
     <style>
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
             display: flex;
             flex-direction: column;
             align-items: center;
@@ -35,11 +35,12 @@
         /* Quiz Content Areas */
         .content-area {
             margin: 20px 0;
-            cursor: pointer; /* Indicates clickable */
+            cursor: pointer;
             padding: 20px;
             border: 2px dashed #cbd5e0;
             border-radius: 10px;
             transition: all 0.3s ease;
+            -webkit-tap-highlight-color: transparent; /* iOS tap highlight remove */
         }
         .content-area:hover {
             background-color: #f8fafc;
@@ -73,14 +74,15 @@
             justify-content: center;
         }
         button {
-            padding: 10px 20px;
+            padding: 12px 24px; /* Larger touch target for mobile */
             font-size: 1rem;
             cursor: pointer;
             border: none;
-            border-radius: 5px;
+            border-radius: 8px;
             background-color: #4299e1;
             color: white;
             transition: background 0.2s;
+            touch-action: manipulation;
         }
         button:hover { background-color: #3182ce; }
         button:disabled { background-color: #cbd5e0; cursor: not-allowed; }
@@ -90,7 +92,6 @@
             font-size: 1rem;
         }
 
-        /* Status */
         .status {
             position: absolute;
             top: 10px;
@@ -204,7 +205,6 @@
             { w: "temporarily", d: "for a certain period of time, not permanently" },
 
             // --- Historical Preservation ---
-            // Note: Source table had Def on left, Word on right. Normalized here.
             { w: "preservation", d: "the act of keeping something in good condition" },
             { w: "desire", d: "a strong wish or feeling that you want something" },
             { w: "heritage", d: "traditions/languages/buildings handed down from the past" },
@@ -236,18 +236,26 @@
         let currentIndex = 0;
         let currentList = [];
         let isRevealed = false;
+        let pauseTimer = null; // To manage the silence timer
 
-        // --- Core Logic ---
+        // Voice caching
+        let preferredVoice = null;
+        window.speechSynthesis.onvoiceschanged = loadVoices;
+        function loadVoices() {
+            const voices = window.speechSynthesis.getVoices();
+            // Try to find a high-quality US English voice (common on iPhone)
+            // Priority: Samantha (iOS), Google US English, then any en-US
+            preferredVoice = voices.find(v => v.name === 'Samantha') || 
+                             voices.find(v => v.name === 'Google US English') ||
+                             voices.find(v => v.lang === 'en-US');
+        }
+        loadVoices(); // Initial try
 
         function startQuiz() {
-            // Check shuffle setting
             const shouldShuffle = document.getElementById('shuffleCheck').checked;
-            
-            // Clone data
             currentList = [...vocabData];
             
             if (shouldShuffle) {
-                // Fisher-Yates Shuffle
                 for (let i = currentList.length - 1; i > 0; i--) {
                     const j = Math.floor(Math.random() * (i + 1));
                     [currentList[i], currentList[j]] = [currentList[j], currentList[i]];
@@ -259,6 +267,9 @@
             document.getElementById('nextBtn').disabled = false;
             document.getElementById('replayBtn').disabled = false;
             
+            // On iOS, voices might not load until first interaction, try loading again
+            if(!preferredVoice) loadVoices();
+
             loadQuestion();
         }
 
@@ -268,38 +279,57 @@
                 return;
             }
 
+            // Clear any pending timers from previous question
+            if (pauseTimer) clearTimeout(pauseTimer);
+            window.speechSynthesis.cancel();
+
             const item = currentList[currentIndex];
             isRevealed = false;
 
-            // UI Updates
             document.getElementById('counter').innerText = `${currentIndex + 1} / ${currentList.length}`;
             document.getElementById('wordText').innerText = "???";
-            document.getElementById('wordText').style.color = "#cbd5e0"; // Greyed out
+            document.getElementById('wordText').style.color = "#cbd5e0";
             document.getElementById('defText').innerText = "(Listening...)";
             document.querySelector('.content-area').style.backgroundColor = "white";
 
-            // Trigger Audio
             playAudio();
         }
 
         function playAudio() {
             if (currentIndex >= currentList.length) return;
+            // Clear timer and speech to prevent overlap
+            if (pauseTimer) clearTimeout(pauseTimer);
+            window.speechSynthesis.cancel();
             
             const item = currentList[currentIndex];
-            
             if(!item.w) return;
 
             const firstChar = item.w.trim().charAt(0);
-            
-            // 【変更点】 間（タメ）を作るため、カンマと三点リーダーを追加
-            const speechText = `${item.d}. ... ... Starts with, ... ... ... ${firstChar}.`;
 
-            const utter = new SpeechSynthesisUtterance(speechText);
-            utter.lang = 'en-US';
-            utter.rate = 0.9; 
+            // --- iOS対応: 2段階読み上げ方式 ---
             
-            window.speechSynthesis.cancel(); 
-            window.speechSynthesis.speak(utter);
+            // 1. 定義文の作成
+            const utterDef = new SpeechSynthesisUtterance(item.d);
+            utterDef.lang = 'en-US';
+            utterDef.rate = 0.9; // 少しゆっくり
+            if(preferredVoice) utterDef.voice = preferredVoice;
+
+            // 2. 定義文が終わった後の処理
+            utterDef.onend = function() {
+                // ここでJavaScriptのタイマーを使って「本当の間」を作る（1.2秒）
+                pauseTimer = setTimeout(() => {
+                    // 3. ヒントの読み上げ
+                    const utterHint = new SpeechSynthesisUtterance(`Starts with ${firstChar}`);
+                    utterHint.lang = 'en-US';
+                    utterHint.rate = 0.85; // ヒントはさらに少しゆっくり
+                    if(preferredVoice) utterHint.voice = preferredVoice;
+                    
+                    window.speechSynthesis.speak(utterHint);
+                }, 1200); // 1200ms = 1.2秒の完全な沈黙
+            };
+
+            // 最初の発話を開始
+            window.speechSynthesis.speak(utterDef);
         }
 
         function revealAnswer() {
@@ -310,13 +340,14 @@
             document.getElementById('wordText').innerText = item.w;
             document.getElementById('wordText').style.color = "#2b6cb0";
             document.getElementById('defText').innerText = item.d;
-            document.querySelector('.content-area').style.backgroundColor = "#e6fffa"; // Light green hint
+            document.querySelector('.content-area').style.backgroundColor = "#e6fffa";
             
             isRevealed = true;
         }
 
         function nextQuestion() {
             if (!isRevealed) {
+                if (pauseTimer) clearTimeout(pauseTimer);
                 window.speechSynthesis.cancel();
             }
             currentIndex++;
@@ -326,7 +357,7 @@
         // --- Keyboard Support ---
         document.addEventListener('keydown', function(event) {
             if (event.code === 'Space') {
-                event.preventDefault(); // Stop scrolling
+                event.preventDefault();
                 if (!isRevealed) revealAnswer();
             }
             if (event.code === 'ArrowRight') {
@@ -335,7 +366,6 @@
                 }
             }
         });
-
     </script>
 </body>
 </html>
