@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>単語・定義クイズ</title>
+    <style>
+        body {
+            font-family: "Helvetica Neue", Arial, sans-serif;
+            background-color: #f4f4f9;
+            color: #333;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        h1 {
+            margin-bottom: 20px;
+            font-size: 1.5rem;
+            color: #2c3e50;
+        }
+
+        .controls {
+            margin-bottom: 20px;
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        button, select {
+            padding: 10px 20px;
+            font-size: 1rem;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        button {
+            background-color: #3498db;
+            color: white;
+        }
+
+        button:hover {
+            background-color: #2980b9;
+        }
+
+        button.reset {
+            background-color: #e74c3c;
+        }
+        
+        button.reset:hover {
+            background-color: #c0392b;
+        }
+
+        select {
+            border: 1px solid #ccc;
+            background-color: white;
+        }
+
+        .card-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 15px;
+            width: 100%;
+            max-width: 1000px;
+        }
+
+        .card {
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            padding: 20px;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+            position: relative;
+            min-height: 100px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+        }
+
+        .card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 10px rgba(0,0,0,0.15);
+        }
+
+        .category-tag {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            font-size: 0.7rem;
+            background-color: #ecf0f1;
+            color: #7f8c8d;
+            padding: 2px 6px;
+            border-radius: 4px;
+        }
+
+        .question {
+            font-size: 1.1rem;
+            font-weight: 500;
+            margin-bottom: 10px;
+            color: #2c3e50;
+        }
+
+        .answer {
+            font-size: 1.2rem;
+            font-weight: bold;
+            color: #27ae60;
+            margin-top: 10px;
+            display: none; /* 初期状態は非表示 */
+            border-top: 1px solid #eee;
+            padding-top: 10px;
+            width: 100%;
+        }
+
+        .card.revealed .answer {
+            display: block; /* クリックで表示 */
+        }
+        
+        .card.revealed {
+            background-color: #f9fff9;
+            border: 1px solid #a9dfbf;
+        }
+
+    </style>
+</head>
+<body>
+
+    <h1>英単語 定義あてクイズ</h1>
+
+    <div class="controls">
+        <select id="categoryFilter" onchange="filterByCategory()">
+            <option value="all">全てのカテゴリ</option>
+            <option value="Lefties Righties">Lefties & Righties</option>
+            <option value="Bucket List">The Bucket List</option>
+            <option value="Historical Preservation">Historical Preservation</option>
+            <option value="Knocks, Suits and Bowing">Knocks, Suits and Bowing</option>
+        </select>
+        <button onclick="shuffleCards()">🔀 シャッフル</button>
+        <button class="reset" onclick="resetCards()">すべて隠す</button>
+    </div>
+
+    <div id="quizContainer" class="card-container">
+        </div>
+
+    <script>
+        // PDFデータから抽出した単語リスト
+        const vocabData = [
+            // Lefties Righties
+            { t: "Lefties Righties", q: "to some degree, not completely", a: "to an extent" },
+            { t: "Lefties Righties", q: "affected by", a: "influenced by" },
+            { t: "Lefties Righties", q: "attracted to", a: "drawn to" },
+            { t: "Lefties Righties", q: "each other", a: "one another" },
+            { t: "Lefties Righties", q: "evaluate", a: "measure" },
+            { t: "Lefties Righties", q: "an explanation based on limited evidence", a: "hypothesis" },
+            { t: "Lefties Righties", q: "right-handed/left-handed person", a: "righty / lefty" },
+            { t: "Lefties Righties", q: "likely to", a: "tend to" },
+            { t: "Lefties Righties", q: "stronger, main", a: "dominant" },
+            { t: "Lefties Righties", q: "recognize", a: "perceive" },
+            { t: "Lefties Righties", q: "gradually reach a particular stage", a: "come to" },
+            { t: "Lefties Righties", q: "to connect something in your mind with something else", a: "associate" },
+            { t: "Lefties Righties", q: "approximately, about", a: "roughly" },
+            { t: "Lefties Righties", q: "members of government, public servants", a: "politicians" },
+            { t: "Lefties Righties", q: "find the difference between things", a: "differentiate" },
+            { t: "Lefties Righties", q: "a person who may to be selected for a position/job", a: "candidate" },
+            { t: "Lefties Righties", q: "includes", a: "extends to" },
+            { t: "Lefties Righties", q: "people who take part in something", a: "participants" },
+            { t: "Lefties Righties", q: "people who are trying for a position/job", a: "applicants" },
+            { t: "Lefties Righties", q: "very often", a: "regularly" },
+            { t: "Lefties Righties", q: "goes further than", a: "extends beyond" },
+            { t: "Lefties Righties", q: "existing as an idea or feeling (not a physical object)", a: "abstract" },
+            { t: "Lefties Righties", q: "such as; for example", a: "like" },
+            { t: "Lefties Righties", q: "be a fact", a: "hold true" },
+            { t: "Lefties Righties", q: "at the greatest degree possible", a: "absolute" },
+            { t: "Lefties Righties", q: "for a certain period of time, not permanently", a: "temporarily" },
+
+            // Bucket List
+            { t: "Bucket List", q: "to be willing or ready to do something", a: "take on" },
+            { t: "Bucket List", q: "a mindset; a way of thinking", a: "mentality" },
+            { t: "Bucket List", q: "to start (a plan, a program, etc.)", a: "launch" },
+            { t: "Bucket List", q: "in every case; on every occasion", a: "consistently" },
+            { t: "Bucket List", q: "aware of; able to recognize and understand", a: "attuned to" },
+            { t: "Bucket List", q: "likely to do", a: "inclined to" },
+            { t: "Bucket List", q: "to make it difficult for something to happen", a: "hinder" },
+            { t: "Bucket List", q: "to give someone a job or position", a: "appoint" },
+            { t: "Bucket List", q: "to do something actively, enthusiastically", a: "throw oneself into" },
+            { t: "Bucket List", q: "seems difficult, intimidating", a: "daunting" },
+            { t: "Bucket List", q: "to search for food in nature", a: "forage" },
+            { t: "Bucket List", q: "a rule; a restriction", a: "stricture" },
+            { t: "Bucket List", q: "thinking/worrying about something too much", a: "obsessive" },
+            { t: "Bucket List", q: "to wander freely", a: "roam" },
+            { t: "Bucket List", q: "to become smaller", a: "shrink" },
+            { t: "Bucket List", q: "thought to be; imagined to be", a: "perceived" },
+            { t: "Bucket List", q: "a result", a: "consequence" },
+            { t: "Bucket List", q: "not active", a: "sedentary" },
+            { t: "Bucket List", q: "being overweight", a: "obesity" },
+            { t: "Bucket List", q: "to discover a fact; to find out", a: "determine" },
+            { t: "Bucket List", q: "to remember past events in a positive way", a: "reminisce" },
+            { t: "Bucket List", q: "to gather; to create a list of things", a: "compile" },
+            { t: "Bucket List", q: "to gradually reduce in number", a: "whittle down" },
+            { t: "Bucket List", q: "to make (previously unknown information) known", a: "reveal" },
+
+            // Historical Preservation
+            { t: "Historical Preservation", q: "the act of keeping something in good condition", a: "preservation" },
+            { t: "Historical Preservation", q: "a strong wish or feeling that you want something", a: "desire" },
+            { t: "Historical Preservation", q: "traditions/languages/buildings handed down from the past", a: "heritage" },
+            { t: "Historical Preservation", q: "a statement or reason for/against a point", a: "argument" },
+            { t: "Historical Preservation", q: "the character/style of a building", a: "architecture" },
+            { t: "Historical Preservation", q: "make stronger", a: "reinforce" },
+            { t: "Historical Preservation", q: "large in amount/quantity", a: "significant" },
+            { t: "Historical Preservation", q: "creates/produces", a: "generates" },
+            { t: "Historical Preservation", q: "money received", a: "revenue" },
+            { t: "Historical Preservation", q: "repairs/maintenance", a: "upkeep" },
+            { t: "Historical Preservation", q: "put (a building) into good condition", a: "renovate" },
+            { t: "Historical Preservation", q: "a heavy responsibility/a difficult problem", a: "burden" },
+            { t: "Historical Preservation", q: "extremely large", a: "immense" },
+            { t: "Historical Preservation", q: "particular/specific", a: "specialized" },
+            { t: "Historical Preservation", q: "including all aspects", a: "comprehensive" },
+            { t: "Historical Preservation", q: "usefulness", a: "functionality" },
+            { t: "Historical Preservation", q: "rules/regulations", a: "codes" },
+            { t: "Historical Preservation", q: "changing something to make it suitable", a: "adapting" },
+            { t: "Historical Preservation", q: "so high or so much that it prevents something from being done", a: "prohibitively" },
+            { t: "Historical Preservation", q: "completely destroy a building or structure", a: "demolish" },
+            { t: "Historical Preservation", q: "sets of beliefs that guide behavior", a: "philosophies" },
+            { t: "Historical Preservation", q: "gives special attention to", a: "emphasizes" },
+            { t: "Historical Preservation", q: "the quality of being real/genuine", a: "authenticity" },
+            { t: "Historical Preservation", q: "especially, mostly", a: "particularly" },
+            { t: "Historical Preservation", q: "uninterrupted/nonstop", a: "continuous" },
+            { t: "Historical Preservation", q: "relating to the soul", a: "spiritual" },
+
+            // Knocks, Suits and Bowing
+            { t: "Knocks, Suits and Bowing", q: "bending the body forward from the waist as a social gesture/greeting", a: "bowing" },
+            { t: "Knocks, Suits and Bowing", q: "is important", a: "matters" },
+            { t: "Knocks, Suits and Bowing", q: "a candidate", a: "applicant" },
+            { t: "Knocks, Suits and Bowing", q: "causing an action", a: "prompting" },
+            { t: "Knocks, Suits and Bowing", q: "employ, give a job to", a: "hire" },
+            { t: "Knocks, Suits and Bowing", q: "a situation with many hidden problems", a: "minefield" },
+            { t: "Knocks, Suits and Bowing", q: "sameness", a: "uniformity" },
+            { t: "Knocks, Suits and Bowing", q: "of main importance", a: "paramount" },
+            { t: "Knocks, Suits and Bowing", q: "entire costume", a: "ensemble" },
+            { t: "Knocks, Suits and Bowing", q: "colorful, showy", a: "loud" },
+            { t: "Knocks, Suits and Bowing", q: "as stated or reported by", a: "according to" },
+            { t: "Knocks, Suits and Bowing", q: "to show disapproval", a: "frowned upon" },
+            { t: "Knocks, Suits and Bowing", q: "linked together (in one's mind)", a: "associated with" },
+            { t: "Knocks, Suits and Bowing", q: "empty, not occupied", a: "vacant" },
+            { t: "Knocks, Suits and Bowing", q: "permission", a: "consent" },
+            { t: "Knocks, Suits and Bowing", q: "advised, cautioned", a: "warned" },
+            { t: "Knocks, Suits and Bowing", q: "considered to be", a: "regarded as" },
+            { t: "Knocks, Suits and Bowing", q: "people in a higher rank, grade or age", a: "superiors" }
+        ];
+
+        let currentList = [...vocabData];
+
+        function renderCards() {
+            const container = document.getElementById('quizContainer');
+            container.innerHTML = '';
+
+            currentList.forEach(item => {
+                const card = document.createElement('div');
+                card.className = 'card';
+                card.onclick = function() {
+                    this.classList.toggle('revealed');
+                };
+
+                const tag = document.createElement('div');
+                tag.className = 'category-tag';
+                tag.innerText = item.t;
+
+                const question = document.createElement('div');
+                question.className = 'question';
+                question.innerText = item.q;
+
+                const answer = document.createElement('div');
+                answer.className = 'answer';
+                answer.innerText = item.a;
+
+                card.appendChild(tag);
+                card.appendChild(question);
+                card.appendChild(answer);
+                container.appendChild(card);
+            });
+        }
+
+        function filterByCategory() {
+            const selected = document.getElementById('categoryFilter').value;
+            if (selected === 'all') {
+                currentList = [...vocabData];
+            } else {
+                currentList = vocabData.filter(item => item.t === selected);
+            }
+            renderCards();
+        }
+
+        function shuffleCards() {
+            // Fisher-Yates shuffle
+            for (let i = currentList.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [currentList[i], currentList[j]] = [currentList[j], currentList[i]];
+            }
+            renderCards();
+        }
+
+        function resetCards() {
+            // 全てのカードのrevealedクラスを外す
+            const cards = document.querySelectorAll('.card');
+            cards.forEach(card => card.classList.remove('revealed'));
+        }
+
+        // 初回表示
+        renderCards();
+
+    </script>
+</body>
+</html>
